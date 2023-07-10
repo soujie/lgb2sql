@@ -49,7 +49,7 @@ class Path(list):
         return self.__repr__()
 
 class lgb2sql:
-    def __init__(self,lgb_model:lgb.DaskLGBMRegressor,) -> None:
+    def __init__(self,lgb_model:lgb.LGBMRegressor,) -> None:
         self.booster = lgb_model.booster_
         self.model_json = self.booster.dump_model()
         self.objective = self.model_json['objective']
@@ -87,7 +87,7 @@ class lgb2sql:
         tree_query += f'END AS subtree_{id} \n'
         return tree_query
 
-    def export_sql(self,path:str,pk:str,feature_table:str = None):
+    def export_sql(self,export_path:str,pk:str,feature_table:str = None):
         if self.objective == 'regression':
             obj_query = '\n ,'+'+'.join([f'subtree_{i}' for i in range(len(self.trees))])+' AS Score'
         elif self.objective == 'binary sigmoid:1':
@@ -107,8 +107,17 @@ class lgb2sql:
         base_query+= tree_query
         
         if feature_table:
-            base_query+= f'\n from {feature_table} \n )'      
+            base_query+= f'\n from {feature_table} \n )'  +'t'    
         else:
-            base_query+= f'\n from 入模变量表 \n )'  
+            base_query+= f'\n from 入模变量表 \n )' +'t'
+        
+        
+        mapper = dict(sorted(self.feature_mapper.items(),key=lambda x:x[0],reverse=True))    
+        for k,v in mapper.items():
+            base_query=base_query.replace(k,v)
+            
+        if export_path:
+            with open(export_path,'w',encoding='utf-8') as f :
+                f.write(base_query)
         
         return base_query 
